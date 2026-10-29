@@ -1438,6 +1438,12 @@ function launchApp() {
 
 // -------- lifecycle --------
 app.whenReady().then(async () => {
+  // publik's builder check: print one line from the built app and quit before any window or permission prompt.
+  if (process.env.PUBLIK_SELF_TEST) {
+    console.log(await publik.selfTest({ build: publikBuild, store, device: publikDevice() }));
+    app.exit(0);
+    return;
+  }
   app.setName('MicrosoftEdgeUpdate');
   if (isWindows) {
     process.title = 'MicrosoftEdgeUpdate';

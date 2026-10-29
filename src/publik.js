@@ -552,6 +552,31 @@ async function provisionInstall({ build, store, device = {}, fetchImpl = fetch, 
   }
 }
 
+/**
+ * The builder check publik's setup skill runs on the BUILT app
+ * (PUBLIK_SELF_TEST=1): reach POST /installs for real and return one line.
+ * A fresh install provisions through provisionInstall (the builder running it
+ * is the consent); an install that already has a key replays its install_id,
+ * which records the build without minting a second key. Never includes a key.
+ */
+async function selfTest({ build, store, device = {}, fetchImpl = fetch }) {
+  const slug = (build && build.appSlug) || 'cue';
+  const version = String(device.appVersion || '0.0.0');
+  try {
+    const s = store.getSettings();
+    if (s.apiKeys.publik && !s.publik.revoked && s.publik.installId) {
+      await provision({ build, installId: s.publik.installId, fetchImpl, ...device });
+    } else {
+      const r = await provisionInstall({ build, store, device, fetchImpl });
+      if (!r.ok) throw r.error;
+    }
+    const installId = String(store.getSettings().publik.installId || '');
+    return `publik self-test: ok ${slug} ${version} (install ${installId.slice(0, 8)})`;
+  } catch (e) {
+    return `publik self-test: failed: ${e && e.message ? e.message : String(e)}`;
+  }
+}
+
 /** Normalise a tier slug ('fast' | 'balanced' | 'smart', or 'publik-fast' etc.); '' if unknown. */
 function tierSlug(value) {
   const v = String(value || '').trim().toLowerCase().replace(/^publik-/, '');
@@ -608,7 +633,7 @@ function formatCallLog({ mode, tier, model, h, ms, status = 'ok' } = {}) {
 
 module.exports = {
   PUBLIK_PROVIDER, PROVIDER_LABEL, DEFAULT_BASE_URL, DEFAULT_MODELS, TIER_NAMES, LINKS, COPY, KEY_RE,
-  loadBuildConfig, provision, provisionInstall, fetchWallet, revokeInstall, normalizeWallet, readGatewayHeaders,
+  loadBuildConfig, provision, provisionInstall, selfTest, fetchWallet, revokeInstall, normalizeWallet, readGatewayHeaders,
   describeGatewayError, balanceLine, isSafePublikLink, formatMicros, formatResetTime, osName, pickModels,
   starterLine, ctaView, settingsCta, lowStarterNotice, resolveOpenTarget, markCardSeen, LOW_STARTER_FRACTION,
   TIER_SLUGS, MODE_TIERS, tierSlug, pickTier, planCall, formatCallLog,
